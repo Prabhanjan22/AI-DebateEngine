@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent AI Debate</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Setup Screen -->
+        <section id="setup-screen" class="glass-panel active">
+            <div class="logo-area">
+                <div class="icon-pulse"></div>
+                <h1>Debate<span>AI</span></h1>
+            </div>
+            <p class="subtitle">Witness high-level reasoning as AI agents debate your topics.</p>
+            
+            <form id="setup-form">
+                <div class="input-group">
+                    <label for="topic">Debate Topic</label>
+                    <textarea id="topic" placeholder="e.g., Should artificial intelligence be heavily regulated?" required rows="3"></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="rounds">Number of Rounds</label>
+                    <input type="number" id="rounds" min="1" max="10" value="2" required>
+                    <span class="helper-text">Each round consists of a PRO, AGAINST, and USER turn.</span>
+                </div>
+                <button type="submit" class="btn-primary" id="start-btn">
+                    <span>Initialize Debate</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </button>
+            </form>
+        </section>
+
+        <!-- Debate Screen -->
+        <section id="debate-screen" class="glass-panel hidden">
+            <header class="debate-header">
+                <div class="debate-info">
+                    <h2>Topic: <span id="display-topic"></span></h2>
+                    <p class="round-indicator">Round <span id="display-round">1</span> of <span id="display-total-rounds"></span></p>
+                </div>
+                <div class="status-badge" id="debate-status">Initializing...</div>
+                <button id="trace-btn" class="btn-secondary hidden" style="margin-left:10px; font-size:12px; padding:4px 12px;">Trace</button>
+            </header>
+
+            <div class="chat-container" id="chat-container">
+                <!-- Chat messages will be injected here -->
+            </div>
+
+            <!-- User Input Area -->
+            <div class="user-input-area hidden" id="user-input-area">
+                <div class="input-wrapper">
+                    <textarea id="user-message" placeholder="Type your argument here..." rows="2"></textarea>
+                    <button id="send-btn" class="btn-send">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Verdict Modal -->
+        <div id="verdict-modal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <div class="trophy-icon">🏆</div>
+                <h2>Debate Concluded</h2>
+                <div class="winner-badge" id="verdict-winner">WINNER: PRO</div>
+                <p class="verdict-reasoning" id="verdict-reasoning">Reasoning goes here...</p>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                    <button id="restart-btn" class="btn-secondary">Start New Debate</button>
+                    <button id="trace-from-modal-btn" class="btn-secondary">View Trace</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trace Modal -->
+        <div id="trace-modal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel" style="max-width: 800px; width: 90%; max-height: 85vh; display: flex; flex-direction: column;">
+                <h2>Observability Trace</h2>
+                <div id="trace-content" style="text-align: left; font-size: 13px; font-family: monospace; white-space: pre-wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; overflow-y: auto; flex-grow: 1; margin-bottom: 15px;">Loading...</div>
+                <button id="close-trace-btn" class="btn-secondary">Close Trace</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template for chat messages -->
+    <template id="message-template">
+        <div class="message-wrapper">
+            <div class="message-avatar"></div>
+            <div class="message-content-wrapper">
+                <div class="message-header">
+                    <span class="message-speaker"></span>
+                </div>
+                <div class="message-bubble">
+                    <div class="message-text"></div>
+                    <div class="message-meta">
+                        <div class="fact-check hidden">
+                            <span class="fc-assessment"></span>
+                            <span class="fc-tooltip"></span>
+                        </div>
+                        <div class="score hidden">
+                            <span class="score-overall"></span>
+                            <div class="score-tooltip">
+                                <p>Logic: <span class="score-logic"></span>/10</p>
+                                <p>Relevance: <span class="score-rel"></span>/10</p>
+                                <p>Persuasiveness: <span class="score-pers"></span>/10</p>
+                                <hr>
+                                <p class="score-reason"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="app.js?v=3"></script>
+</body>
+</html>
