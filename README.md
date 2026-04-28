@@ -303,11 +303,8 @@ MIT License
 ---
 
 ## 👨‍💻 Author
-Prabhanjan J
 
-
-
-**Prabhas**
+**Prabhanjan J**
 
 
 
