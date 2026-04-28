@@ -265,7 +265,7 @@ python -m tests.test_phase5_6
 
 ---
 
-## 💡 Key Highlights (For Jury / Recruiters)
+## 💡 Key Highlights 
 
 * Implements **real-world AI architecture concepts**:
 
@@ -283,7 +283,6 @@ python -m tests.test_phase5_6
 
 ## 🔮 Future Enhancements
 
-* User participation as a third debate agent
 * Live web search integration
 * Debate visualization dashboards
 * Multi-modal support (voice / documents)
@@ -304,6 +303,9 @@ MIT License
 ---
 
 ## 👨‍💻 Author
+Prabhanjan J
+
+
 
 **Prabhas**
 
