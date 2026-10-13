@@ -7,20 +7,33 @@ Provides RAG (Retrieval-Augmented Generation) capabilities for the agents.
 
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from typing import List, Dict
 
 class RAGManager:
     """
     Manages FAISS index and local embeddings for debate arguments.
+    Uses lazy loading for SentenceTransformer to allow near-instantaneous startup.
     """
     def __init__(self, embedding_model: str = "all-MiniLM-L6-v2"):
-        # Load local embedding model
-        self.model = SentenceTransformer(embedding_model)
-        self.vector_dim = self.model.get_sentence_embedding_dimension()
+        self.embedding_model = embedding_model
+        self._model = None
+        self._vector_dim = 384  # Default dimension for all-MiniLM-L6-v2
         
         # In-memory dictionary mapping session_id to its specific index and documents
         self._sessions = {}
+
+    @property
+    def model(self):
+        """Lazy-loaded SentenceTransformer instance."""
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer(self.embedding_model)
+            self._vector_dim = self._model.get_embedding_dimension()
+        return self._model
+
+    @property
+    def vector_dim(self):
+        return self._vector_dim
 
     def _ensure_session(self, debate_id: str):
         """Initialize FAISS index and doc store for a new debate."""

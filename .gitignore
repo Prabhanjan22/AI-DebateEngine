@@ -23,3 +23,21 @@ dist/
 # Project Specific
 *.log
 faiss_index/
+
+# Data directory — debate records (may contain session data)
+data/debates/*.jsonl
+data/processed/
+data/ml/*.joblib
+
+# Keep the directory itself tracked
+!data/debates/.gitkeep
+!data/processed/.gitkeep
+!data/ml/.gitkeep
+
+# Cloud, simulation, and assistant scratch files
+.kiro/
+aws_simulation/
+infra/
+lambda/
+Dockerfile
+

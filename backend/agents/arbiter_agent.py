@@ -36,37 +36,57 @@ class ArbiterAgent(BaseAgent):
     def generate(self, conversation_history: list[dict], extra_context: str = "", mcp_manager=None) -> str:
         """
         Call the Groq LLM to evaluate the entire debate history and declare a winner.
+        Uses a two-layer approach for model compatibility.
         """
         sys_prompt = self.system_prompt
         if extra_context:
             sys_prompt += f"\n\n{extra_context}"
 
         messages = [{"role": "system", "content": sys_prompt}]
-        
-        # Include the entire history for the arbiter
+
         for msg in conversation_history:
             clean_msg = {k: v for k, v in msg.items() if k in ["role", "content", "name"]}
             messages.append(clean_msg)
 
+        # Attempt 1: json_object mode
         try:
             response = _client.chat.completions.create(
                 messages=messages,
                 model=MODEL,
-                temperature=0.2,    # Low temperature for consistency, slight leeway for reasoning
-                max_tokens=250,
+                temperature=0.2,
+                max_tokens=400,
                 response_format={"type": "json_object"}
             )
-            
             content = response.choices[0].message.content.strip()
-            
-            # Verify the LLM returned valid JSON format
-            json.loads(content)
+            json.loads(content)  # validate
             return content
+        except Exception:
+            pass
 
-        except Exception as e:
-            # Fallback to tie if LLM output fails validation
-            fallback = {
-                "winner": "TIE",
-                "reasoning": f"Arbiter error: {str(e)}"
-            }
-            return json.dumps(fallback)
+        # Attempt 2: plain text with JSON extraction
+        try:
+            response = _client.chat.completions.create(
+                messages=messages,
+                model=MODEL,
+                temperature=0.2,
+                max_tokens=400,
+            )
+            content = response.choices[0].message.content.strip()
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            if start != -1 and end > start:
+                json_str = content[start:end]
+                parsed = json.loads(json_str)
+                result = {
+                    "winner": str(parsed.get("winner", "TIE")),
+                    "reasoning": str(parsed.get("reasoning", "No reasoning provided.")),
+                }
+                return json.dumps(result)
+        except Exception:
+            pass
+
+        fallback = {
+            "winner": "TIE",
+            "reasoning": "Arbiter could not produce a verdict — model did not return parseable JSON."
+        }
+        return json.dumps(fallback)

@@ -17,14 +17,17 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from backend.debate_engine import DebateEngine
+from backend.persistence.debate_store import DebateStore
 
 
 # ── Router setup ──────────────────────────────────────────────────────────────
 router = APIRouter()
 
 # Single shared engine instance — all routes use this
-# Manages global state for all active debate sessions in memory
 engine = DebateEngine()
+
+# Shared persistence store for analytics/history queries
+_store = DebateStore()
 
 
 # ── Pydantic Request / Response Models ────────────────────────────────────────
@@ -221,3 +224,42 @@ def get_trace(debate_id: str):
         docs=docs,
         history=session.history,
     )
+
+
+# ── Analytics & History Endpoints (Phase 2) ───────────────────────────────────
+
+@router.get("/analytics", tags=["Analytics"])
+def get_analytics():
+    """
+    Return aggregate statistics across all persisted debate records.
+    Used by the analytics dashboard to show debate volume, score trends,
+    verdict distribution, and topic history.
+    """
+    return _store.get_stats()
+
+
+@router.get("/history", tags=["Analytics"])
+def get_history(limit: int = 20):
+    """
+    Return the N most recently completed debate records (summaries only).
+    Full transcripts are excluded to keep response size manageable.
+    """
+    records = _store.load_recent(n=limit)
+    return {
+        "total_saved": _store.count(),
+        "showing": len(records),
+        "records": [
+            {
+                "debate_id": r.debate_id,
+                "topic": r.topic,
+                "timestamp": r.timestamp,
+                "total_rounds": r.total_rounds,
+                "winner": r.winner,
+                "pro_avg_score": r.pro_score_summary.avg_overall if r.pro_score_summary else None,
+                "against_avg_score": r.against_score_summary.avg_overall if r.against_score_summary else None,
+                "duration_seconds": r.duration_seconds,
+                "had_error": r.had_error,
+            }
+            for r in reversed(records)
+        ]
+    }

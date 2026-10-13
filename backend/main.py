@@ -7,6 +7,15 @@ Starts the FastAPI application and registers all routers.
 Run with: uvicorn backend.main:app --reload
 """
 
+import os
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path so the module can be run directly
+_ROOT_DIR = str(Path(__file__).resolve().parent.parent)
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

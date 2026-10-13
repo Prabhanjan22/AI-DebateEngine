@@ -8,15 +8,11 @@ Responsibilities:
 - Controls turn order: PRO → AGAINST → USER → (repeat)
 - Stores full conversation history per session
 - Provides next_turn() which advances the debate by one step
-- Designed to be extended in later phases (memory, scoring, fact-check)
-
-Turn order logic:
-  Each "round" has 3 turns: PRO (index 0), AGAINST (index 1), USER (index 2)
-  After USER turn, we loop back to PRO for the next round.
+- Persists completed debate records to data/debates/debates.jsonl (Phase 2)
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from backend.agents.pro_agent import ProAgent
@@ -26,7 +22,11 @@ from backend.agents.scoring_agent import ScoringAgent
 from backend.agents.arbiter_agent import ArbiterAgent
 from backend.memory.rag_manager import RAGManager
 from backend.mcp import MCPManager
+from backend.persistence.debate_store import DebateStore, build_record_from_session
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────
@@ -65,7 +65,12 @@ class DebateSession:
         self.turn_index: int = 0           # Starts at PRO (index 0)
         self.history: list[dict] = []      # Full conversation log
         self.status: str = STATUS_ACTIVE
-        self.created_at: str = datetime.utcnow().isoformat()
+        self.created_at: str = datetime.now(timezone.utc).isoformat()
+
+        # Phase 2: Accumulate per-turn analytics for persistence
+        self._score_history: list[dict] = []       # [{"speaker": ..., "score": {...}}, ...]
+        self._fact_check_history: list[dict] = []  # [{"speaker": ..., "fact_check": {...}}, ...]
+        self._rag_retrieval_count: int = 0
 
     def whose_turn(self) -> str:
         """Returns the name of who should speak next."""
@@ -136,6 +141,9 @@ class DebateEngine:
         # Phase 4: MCP system for tool-augmented reasoning
         self._mcp_manager = MCPManager()
 
+        # Phase 2: Persistence store
+        self._store = DebateStore()
+
     # ── Session Management ────────────────────────────────────────────
 
     def start_debate(self, topic: str, total_rounds: int = 3) -> DebateSession:
@@ -170,10 +178,9 @@ class DebateEngine:
     def _run_fact_check(self, session: DebateSession, speaker: str) -> dict:
         """Run the FactCheckerAgent on the latest argument and append result to history."""
         try:
-            # Retrieve relevant historical context via RAG for grounding
             query = session.history[-1]["content"] if session.history else ""
             rag_context = self._rag.get_context_for_agent(session.debate_id, query=query, speaker="SYSTEM")
-            
+
             fact_check_raw = self._fact_checker.generate(
                 conversation_history=session.history,
                 extra_context=rag_context,
@@ -187,15 +194,18 @@ class DebateEngine:
                 "reasoning": f"Fact checker error: {str(e)}"
             }
 
-        # Append to history so other agents see it
         assessment = fact_check_data.get("assessment", "UNVERIFIED")
         reasoning = fact_check_data.get("reasoning", "")
         confidence = fact_check_data.get("confidence", 0)
-        
+
         session.add_to_history(
             "Fact Checker",
             f"[{assessment}] {reasoning} (Confidence: {confidence}%)"
         )
+
+        # Phase 2: Accumulate for persistence
+        session._fact_check_history.append({"speaker": speaker, "fact_check": fact_check_data})
+
         return fact_check_data
 
     def _run_scoring(self, session: DebateSession, speaker: str) -> dict:
@@ -208,18 +218,22 @@ class DebateEngine:
             score_data = json.loads(score_raw)
         except Exception as e:
             score_data = {
-                "logic": 0,
-                "relevance": 0,
-                "persuasiveness": 0,
-                "overall": 0,
+                "logic": 5,
+                "relevance": 5,
+                "persuasiveness": 5,
+                "overall": 5,
                 "reasoning": f"Scoring error: {str(e)}"
             }
 
-        overall = score_data.get("overall", 0)
+        overall = score_data.get("overall", 5)
         session.add_to_history(
             "Scoring Engine",
             f"[Score: {overall}/10] {score_data.get('reasoning', '')}"
         )
+
+        # Phase 2: Accumulate for persistence
+        session._score_history.append({"speaker": speaker, "score": score_data})
+
         return score_data
 
     def next_turn(self, debate_id: str, user_input: Optional[str] = None) -> dict:
@@ -295,6 +309,7 @@ class DebateEngine:
         memory_context = self._rag.get_context_for_agent(
             debate_id=session.debate_id, query=query, speaker=speaker
         )
+        session._rag_retrieval_count += 1
 
         # Generate response using full conversation history + memory context + tools
         response_text = agent.generate(
@@ -341,15 +356,16 @@ class DebateEngine:
         return session.history
 
     def evaluate_debate(self, debate_id: str) -> dict:
-        """Run the Arbiter to evaluate the whole debate and declare a winner."""
+        """Run the Arbiter to evaluate the whole debate and declare a winner.
+        Also persists the completed debate record for data pipeline consumption.
+        """
         session = self.get_session(debate_id)
         if session is None:
             return {"winner": "UNKNOWN", "reasoning": "Session not found."}
 
         try:
-            # Provide Arbiter with topic-grounded context from FAISS
             rag_context = self._rag.get_context_for_agent(debate_id, query=session.topic, speaker="SYSTEM")
-            
+
             arbiter_raw = self._arbiter_agent.generate(
                 conversation_history=session.history,
                 extra_context=rag_context,
@@ -361,6 +377,25 @@ class DebateEngine:
                 "winner": "TIE",
                 "reasoning": f"Arbiter evaluation error: {str(e)}"
             }
-        
+
         session.add_to_history("Arbiter", f"[{arbiter_data.get('winner', 'TIE')}] {arbiter_data.get('reasoning', '')}")
+
+        # Phase 2: Persist the completed debate record
+        try:
+            record = build_record_from_session(
+                session=session,
+                score_history=session._score_history,
+                fact_check_history=session._fact_check_history,
+                started_at=session.created_at,
+                verdict=arbiter_data,
+                rag_retrievals=session._rag_retrieval_count,
+            )
+            saved = self._store.save(record)
+            if saved:
+                logger.info(f"Debate {debate_id} record persisted successfully.")
+            else:
+                logger.warning(f"Debate {debate_id} record could not be persisted.")
+        except Exception as e:
+            logger.error(f"Persistence error for debate {debate_id}: {e}")
+
         return arbiter_data

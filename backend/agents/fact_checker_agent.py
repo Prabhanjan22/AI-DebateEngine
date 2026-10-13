@@ -54,6 +54,7 @@ class FactCheckerAgent(BaseAgent):
             clean_msg = {k: v for k, v in msg.items() if k in ["role", "content"]}
             messages.append(clean_msg)
 
+        # Attempt 1: json_object mode
         try:
             response = _client.chat.completions.create(
                 messages=messages,
@@ -63,15 +64,36 @@ class FactCheckerAgent(BaseAgent):
                 response_format={"type": "json_object"}
             )
             content = response.choices[0].message.content.strip()
-            import json
-            # Verify the LLM returned valid JSON format
             json.loads(content)
             return content
+        except Exception:
+            pass
 
-        except Exception as e:
-            import json
-            return json.dumps({
-                "assessment": "UNVERIFIED",
-                "confidence": 0,
-                "reasoning": f"Fact checker error: {str(e)}"
-            })
+        # Attempt 2: plain text response with JSON extraction
+        try:
+            response = _client.chat.completions.create(
+                messages=messages,
+                model=MODEL,
+                temperature=0.1,
+                max_tokens=200,
+            )
+            content = response.choices[0].message.content.strip()
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            if start != -1 and end > start:
+                json_str = content[start:end]
+                parsed = json.loads(json_str)
+                result = {
+                    "assessment": str(parsed.get("assessment", "OPINION")),
+                    "confidence": int(parsed.get("confidence", 50)),
+                    "reasoning": str(parsed.get("reasoning", "Fact check completed.")),
+                }
+                return json.dumps(result)
+        except Exception:
+            pass
+
+        return json.dumps({
+            "assessment": "UNVERIFIED",
+            "confidence": 0,
+            "reasoning": "Fact check unavailable."
+        })

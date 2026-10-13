@@ -19,7 +19,7 @@ load_dotenv(dotenv_path=_env_path)
 
 # Shared Groq client — created once, reused by all agents
 _client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")  # fallback model
+MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")  # default model available on account
 
 
 class BaseAgent:
@@ -61,6 +61,19 @@ class BaseAgent:
                 "content": f"[Additional context for this turn]: {extra_context}"
             })
 
+        # Ensure there is a user role message to satisfy chat templates (e.g. Qwen / Llama on Groq)
+        has_user_msg = any(m.get("role") == "user" for m in messages)
+        if not has_user_msg:
+            messages.append({
+                "role": "user",
+                "content": f"Please present your opening argument as {self.name} on the debate topic."
+            })
+        elif messages[-1].get("role") != "user":
+            messages.append({
+                "role": "user",
+                "content": f"It is your turn to speak as {self.name}. Please present your counter-argument or response."
+            })
+
         try:
             response = _client.chat.completions.create(
                 messages=messages,
@@ -91,6 +104,11 @@ class BaseAgent:
 
         if extra_context:
             messages.append({"role": "system", "content": f"[Context]: {extra_context}"})
+
+        # Ensure there is a user role message to satisfy chat templates
+        has_user_msg = any(m.get("role") == "user" for m in messages)
+        if not has_user_msg:
+            messages.append({"role": "user", "content": f"Please evaluate this debate as {self.name}."})
 
         kwargs = {
             "model": MODEL,

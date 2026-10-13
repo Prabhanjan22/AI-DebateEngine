@@ -1,0 +1,36 @@
+{
+  "model": "RandomForestClassifier",
+  "n_estimators": 100,
+  "train_samples": 48,
+  "test_samples": 12,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1_score": 1.0,
+  "roc_auc": 1.0,
+  "cv_f1_mean": 0.931,
+  "cv_f1_std": 0.086,
+  "feature_importances": {
+    "combined_avg_score": 0.456,
+    "against_avg_score": 0.176,
+    "pro_avg_score": 0.121,
+    "user_avg_score": 0.072,
+    "score_gap": 0.049,
+    "false_claim_ratio": 0.037,
+    "duration_seconds": 0.027,
+    "fact_check_ratio": 0.024,
+    "rag_retrievals": 0.021,
+    "total_rounds": 0.009,
+    "wikipedia_calls": 0.007
+  },
+  "confusion_matrix": [
+    [
+      9,
+      0
+    ],
+    [
+      0,
+      3
+    ]
+  ],
+  "trained_at": "2026-10-13T11:30:50.971070"
+}

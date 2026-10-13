@@ -1,3 +1,4 @@
+# ── Core Application ─────────────────────────────────────────────────────────
 fastapi==0.111.0
 uvicorn==0.29.0
 groq>=0.9.0
@@ -6,3 +7,18 @@ pydantic==2.7.1
 httpx==0.27.0
 faiss-cpu==1.8.0
 sentence-transformers==2.7.0
+
+# ── AWS SDK & Simulation ──────────────────────────────────────────────────────
+# boto3: real AWS SDK — same code runs against real AWS or moto mock
+boto3==1.34.131
+# moto: AWS service simulation for local development and CI/CD (no AWS account needed)
+moto[s3,lambda,glue,stepfunctions,cloudwatch,iam,cloudtrail,athena]==5.0.14
+
+# ── Data Engineering & ML ─────────────────────────────────────────────────────
+pandas>=2.0.0
+pyarrow>=14.0.0
+scikit-learn>=1.4.0
+joblib>=1.3.0
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest>=8.0.0
